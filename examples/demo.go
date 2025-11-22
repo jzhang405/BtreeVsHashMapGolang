@@ -8,7 +8,7 @@ import (
 )
 
 // 整数比较函数
-func intComparator(a, b interface{}) int {
+func intComparator(a, b any) int {
 	if a.(int) < b.(int) {
 		return -1
 	} else if a.(int) > b.(int) {

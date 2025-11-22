@@ -123,7 +123,7 @@ func (bf *BloomFilter) AddFloat64(f float64) {
 }
 
 // AddGeneric 添加泛型元素
-func (bf *BloomFilter) AddGeneric(item interface{}) {
+func (bf *BloomFilter) AddGeneric(item any) {
 	data := []byte(fmt.Sprintf("%v", item))
 	bf.Add(data)
 }
@@ -169,7 +169,7 @@ func (bf *BloomFilter) ContainsFloat64(f float64) bool {
 }
 
 // ContainsGeneric 检查泛型元素是否存在
-func (bf *BloomFilter) ContainsGeneric(item interface{}) bool {
+func (bf *BloomFilter) ContainsGeneric(item any) bool {
 	data := []byte(fmt.Sprintf("%v", item))
 	return bf.Contains(data)
 }

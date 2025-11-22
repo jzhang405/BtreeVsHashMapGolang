@@ -14,7 +14,7 @@ const (
 )
 
 // 通用比较函数
-var intComparator Comparator = func(a, b interface{}) int {
+var intComparator Comparator = func(a, b any) int {
 	switch a.(type) {
 	case int:
 		if a.(int) < b.(int) {
@@ -385,7 +385,7 @@ func TestConcurrency(t *testing.T) {
 	testConcurrentInsert(hashTable, data, t)
 }
 
-func testConcurrentInsert(ds interface{}, data []int, t *testing.T) {
+func testConcurrentInsert(ds any, data []int, t *testing.T) {
 	// 并发插入测试
 	done := make(chan bool)
 	threads := 4

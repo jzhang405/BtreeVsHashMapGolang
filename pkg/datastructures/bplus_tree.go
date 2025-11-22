@@ -14,22 +14,22 @@ import (
 
 type (
 	// Comparator 比较函数，返回值：-1(小于)、0(等于)、1(大于)
-	Comparator func(a, b interface{}) int
+	Comparator func(a, b any) int
 
 	// KeyValue 键值对
 	KeyValue struct {
-		Key   interface{}
-		Value interface{}
+		Key   any
+		Value any
 	}
 
 	// TreeNode B+树节点
 	TreeNode struct {
-		keys     []interface{}       // 排序后的键列表
-		values   []KeyValue          // 叶子节点的值列表
-		children [][]*TreeNode       // 子节点列表（内部节点）
-		isLeaf   bool                // 是否为叶子节点
-		next     *TreeNode           // 叶子节点链表指针（仅叶子节点使用）
-		parent   *TreeNode           // 父节点指针
+		keys     []any       // 排序后的键列表
+		values   []KeyValue  // 叶子节点的值列表
+		children []*TreeNode // 子节点列表（内部节点）
+		isLeaf   bool        // 是否为叶子节点
+		next     *TreeNode   // 叶子节点链表指针（仅叶子节点使用）
+		parent   *TreeNode   // 父节点指针
 	}
 )
 
@@ -66,7 +66,7 @@ func NewBPlusTree(order int, comparator Comparator) *BPlusTree {
 }
 
 // Insert 插入键值对
-func (t *BPlusTree) Insert(key interface{}, value interface{}) error {
+func (t *BPlusTree) Insert(key any, value any) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -95,7 +95,7 @@ func (t *BPlusTree) Insert(key interface{}, value interface{}) error {
 }
 
 // Search 查找值
-func (t *BPlusTree) Search(key interface{}) (interface{}, bool) {
+func (t *BPlusTree) Search(key any) (any, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -117,7 +117,7 @@ func (t *BPlusTree) Search(key interface{}) (interface{}, bool) {
 }
 
 // Delete 删除键值对
-func (t *BPlusTree) Delete(key interface{}) bool {
+func (t *BPlusTree) Delete(key any) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -148,7 +148,7 @@ func (t *BPlusTree) Delete(key interface{}) bool {
 }
 
 // RangeQuery 范围查询 [start, end)
-func (t *BPlusTree) RangeQuery(start, end interface{}) ([]KeyValue, error) {
+func (t *BPlusTree) RangeQuery(start, end any) ([]KeyValue, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -186,7 +186,7 @@ func (t *BPlusTree) ScanAll() []KeyValue {
 	// 找到最左叶子节点
 	leaf := t.root
 	for !leaf.isLeaf {
-		leaf = leaf.children[0][0]
+		leaf = leaf.children[0]
 	}
 
 	// 遍历所有叶子节点
@@ -214,34 +214,34 @@ func (t *BPlusTree) Height() int {
 	node := t.root
 	for !node.isLeaf {
 		height++
-		node = node.children[0][0]
+		node = node.children[0]
 	}
 	return height
 }
 
 // 内部方法：查找包含指定键的叶子节点
-func (t *BPlusTree) findLeafNode(key interface{}) *TreeNode {
+func (t *BPlusTree) findLeafNode(key any) *TreeNode {
 	node := t.root
 
 	// 从根节点向下查找，直到叶子节点
 	for !node.isLeaf {
-		// 找到第一个大于key的位置
+		// 找到第一个大于key的键的位置
 		idx := 0
-		for idx < len(node.keys) && t.comparator(node.keys[idx], key) < 0 {
+		for idx < len(node.keys) && t.comparator(key, node.keys[idx]) >= 0 {
 			idx++
 		}
 		// 确保索引不越界
 		if idx >= len(node.children) {
 			idx = len(node.children) - 1
 		}
-		node = node.children[idx][0]
+		node = node.children[idx]
 	}
 
 	return node
 }
 
 // 内部方法：将键值对插入叶子节点
-func (t *BPlusTree) insertIntoLeaf(leaf *TreeNode, key interface{}, value interface{}) {
+func (t *BPlusTree) insertIntoLeaf(leaf *TreeNode, key any, value any) {
 	// 找到插入位置
 	insertPos := 0
 	for insertPos < len(leaf.keys) && t.comparator(leaf.keys[insertPos], key) < 0 {
@@ -285,17 +285,11 @@ func (t *BPlusTree) splitLeafNode(leaf *TreeNode) {
 	leaf.values = leaf.values[:splitPos]
 	leaf.next = newLeaf
 
-	// 将新节点插入链表
-	if leaf.next != nil {
-		newLeaf.next = leaf.next
-		leaf.next = newLeaf
-	}
-
 	// 如果这是根节点，创建新根节点
 	if leaf.parent == nil {
 		newRoot := &TreeNode{
-			keys:     []interface{}{newLeaf.keys[0]},
-			children: [][]*TreeNode{{leaf, newLeaf}},
+			keys:     []any{newLeaf.keys[0]},
+			children: []*TreeNode{leaf, newLeaf},
 			isLeaf:   false,
 		}
 		leaf.parent = newRoot
@@ -304,21 +298,29 @@ func (t *BPlusTree) splitLeafNode(leaf *TreeNode) {
 		return
 	}
 
-	// 更新父节点
+	// 更新父节点 - 找到原叶节点在父节点中的位置
 	parent := leaf.parent
-	insertPos := 0
-	for insertPos < len(parent.keys) && t.comparator(parent.keys[insertPos], newLeaf.keys[0]) < 0 {
-		insertPos++
+	leafPos := -1
+	for i := 0; i < len(parent.children); i++ {
+		if parent.children[i] == leaf {
+			leafPos = i
+			break
+		}
 	}
 
-	// 插入新键和子节点
+	if leafPos == -1 {
+		// 这不应该发生
+		panic("leaf node not found in parent")
+	}
+
+	// 在 leafPos 位置插入新键，在 leafPos+1 位置插入新子节点
 	parent.keys = append(parent.keys, nil)
-	copy(parent.keys[insertPos+1:], parent.keys[insertPos:])
-	parent.keys[insertPos] = newLeaf.keys[0]
+	copy(parent.keys[leafPos+1:], parent.keys[leafPos:])
+	parent.keys[leafPos] = newLeaf.keys[0]
 
 	parent.children = append(parent.children, nil)
-	copy(parent.children[insertPos+1:], parent.children[insertPos:])
-	parent.children[insertPos] = []*TreeNode{newLeaf}
+	copy(parent.children[leafPos+2:], parent.children[leafPos+1:])
+	parent.children[leafPos+1] = newLeaf
 	newLeaf.parent = parent
 
 	// 检查父节点是否需要分裂
@@ -346,10 +348,8 @@ func (t *BPlusTree) splitInternalNode(node *TreeNode) {
 	newNode.children = append(newNode.children, node.children[splitPos+1:]...)
 
 	// 更新子节点的父指针
-	for _, childGroup := range newNode.children {
-		for _, child := range childGroup {
-			child.parent = newNode
-		}
+	for _, child := range newNode.children {
+		child.parent = newNode
 	}
 
 	// 更新原节点
@@ -359,8 +359,8 @@ func (t *BPlusTree) splitInternalNode(node *TreeNode) {
 	// 如果这是根节点，创建新根节点
 	if node.parent == nil {
 		newRoot := &TreeNode{
-			keys:     []interface{}{midKey},
-			children: [][]*TreeNode{{node, newNode}},
+			keys:     []any{midKey},
+			children: []*TreeNode{node, newNode},
 			isLeaf:   false,
 		}
 		node.parent = newRoot
@@ -369,21 +369,29 @@ func (t *BPlusTree) splitInternalNode(node *TreeNode) {
 		return
 	}
 
-	// 更新父节点
+	// 更新父节点 - 找到原节点在父节点中的位置
 	parent := node.parent
-	insertPos := 0
-	for insertPos < len(parent.keys) && t.comparator(parent.keys[insertPos], midKey) < 0 {
-		insertPos++
+	nodePos := -1
+	for i := 0; i < len(parent.children); i++ {
+		if parent.children[i] == node {
+			nodePos = i
+			break
+		}
 	}
 
-	// 插入新键和子节点
+	if nodePos == -1 {
+		// 这不应该发生
+		panic("node not found in parent")
+	}
+
+	// 在 nodePos 位置插入新键，在 nodePos+1 位置插入新子节点
 	parent.keys = append(parent.keys, nil)
-	copy(parent.keys[insertPos+1:], parent.keys[insertPos:])
-	parent.keys[insertPos] = midKey
+	copy(parent.keys[nodePos+1:], parent.keys[nodePos:])
+	parent.keys[nodePos] = midKey
 
 	parent.children = append(parent.children, nil)
-	copy(parent.children[insertPos+1:], parent.children[insertPos:])
-	parent.children[insertPos] = []*TreeNode{newNode}
+	copy(parent.children[nodePos+2:], parent.children[nodePos+1:])
+	parent.children[nodePos+1] = newNode
 	newNode.parent = parent
 
 	// 检查祖父节点是否需要分裂
@@ -410,20 +418,20 @@ func (t *BPlusTree) rebalanceLeafNode(leaf *TreeNode) {
 
 	// 找到在父节点中的位置
 	pos := 0
-	for pos < len(parent.children) && parent.children[pos][0] != leaf {
+	for pos < len(parent.children) && parent.children[pos] != leaf {
 		pos++
 	}
 
 	// 尝试从左兄弟节点借键
-	if pos > 0 && len(parent.children[pos-1][0].keys) > t.minKeys {
-		leftSibling := parent.children[pos-1][0]
+	if pos > 0 && len(parent.children[pos-1].keys) > t.minKeys {
+		leftSibling := parent.children[pos-1]
 
 		// 从左兄弟借最后一个键
 		borrowedKey := leftSibling.keys[len(leftSibling.keys)-1]
 		borrowedValue := leftSibling.values[len(leftSibling.values)-1]
 
 		// 在当前节点前插入借来的键
-		leaf.keys = append([]interface{}{borrowedKey}, leaf.keys...)
+		leaf.keys = append([]any{borrowedKey}, leaf.keys...)
 		leaf.values = append([]KeyValue{borrowedValue}, leaf.values...)
 
 		// 从左兄弟删除借出的键
@@ -436,8 +444,8 @@ func (t *BPlusTree) rebalanceLeafNode(leaf *TreeNode) {
 	}
 
 	// 尝试从右兄弟节点借键
-	if pos < len(parent.children)-1 && len(parent.children[pos+1][0].keys) > t.minKeys {
-		rightSibling := parent.children[pos+1][0]
+	if pos < len(parent.children)-1 && len(parent.children[pos+1].keys) > t.minKeys {
+		rightSibling := parent.children[pos+1]
 
 		// 从右兄弟借第一个键
 		borrowedKey := rightSibling.keys[0]
@@ -459,7 +467,7 @@ func (t *BPlusTree) rebalanceLeafNode(leaf *TreeNode) {
 	// 合并节点
 	if pos > 0 {
 		// 与左兄弟合并
-		leftSibling := parent.children[pos-1][0]
+		leftSibling := parent.children[pos-1]
 		leftSibling.keys = append(leftSibling.keys, leaf.keys...)
 		leftSibling.values = append(leftSibling.values, leaf.values...)
 		leftSibling.next = leaf.next
@@ -468,7 +476,7 @@ func (t *BPlusTree) rebalanceLeafNode(leaf *TreeNode) {
 		t.deleteFromInternalNode(parent, pos-1, leaf)
 	} else {
 		// 与右兄弟合并
-		rightSibling := parent.children[pos+1][0]
+		rightSibling := parent.children[pos+1]
 		leaf.keys = append(leaf.keys, rightSibling.keys...)
 		leaf.values = append(leaf.values, rightSibling.values...)
 		leaf.next = rightSibling.next
@@ -491,8 +499,8 @@ func (t *BPlusTree) deleteFromInternalNode(parent *TreeNode, pos int, child *Tre
 
 	// 如果根节点只有一个子节点，简化树
 	if len(parent.keys) == 0 && parent.parent == nil {
-		t.root = parent.children[0][0]
-		parent.children[0][0].parent = nil
+		t.root = parent.children[0]
+		parent.children[0].parent = nil
 	}
 }
 
@@ -502,22 +510,22 @@ func (t *BPlusTree) rebalanceInternalNode(node *TreeNode) {
 
 	// 找到在父节点中的位置
 	pos := 0
-	for pos < len(parent.children) && parent.children[pos][0] != node {
+	for pos < len(parent.children) && parent.children[pos] != node {
 		pos++
 	}
 
 	// 尝试从左兄弟节点借键
-	if pos > 0 && len(parent.children[pos-1][0].keys) > t.minKeys {
-		leftSibling := parent.children[pos-1][0]
+	if pos > 0 && len(parent.children[pos-1].keys) > t.minKeys {
+		leftSibling := parent.children[pos-1]
 
 		// 从父节点借最后一个键到当前节点
 		borrowedKey := parent.keys[pos-1]
-		node.keys = append([]interface{}{borrowedKey}, node.keys...)
+		node.keys = append([]any{borrowedKey}, node.keys...)
 
 		// 从左兄弟借最后一个子节点
-		lastChild := leftSibling.children[len(leftSibling.children)-1][0]
+		lastChild := leftSibling.children[len(leftSibling.children)-1]
 		lastChild.parent = node
-		node.children = append([][]*TreeNode{{lastChild}}, node.children...)
+		node.children = append([]*TreeNode{lastChild}, node.children...)
 
 		// 从左兄弟删除借出的键和子节点
 		leftSibling.keys = leftSibling.keys[:len(leftSibling.keys)-1]
@@ -529,17 +537,17 @@ func (t *BPlusTree) rebalanceInternalNode(node *TreeNode) {
 	}
 
 	// 尝试从右兄弟节点借键
-	if pos < len(parent.children)-1 && len(parent.children[pos+1][0].keys) > t.minKeys {
-		rightSibling := parent.children[pos+1][0]
+	if pos < len(parent.children)-1 && len(parent.children[pos+1].keys) > t.minKeys {
+		rightSibling := parent.children[pos+1]
 
 		// 从父节点借第一个键到当前节点
 		borrowedKey := parent.keys[pos]
 		node.keys = append(node.keys, borrowedKey)
 
 		// 从右兄弟借第一个子节点
-		firstChild := rightSibling.children[0][0]
+		firstChild := rightSibling.children[0]
 		firstChild.parent = node
-		node.children = append(node.children, []*TreeNode{firstChild})
+		node.children = append(node.children, firstChild)
 
 		// 从右兄弟删除借出的键和子节点
 		rightSibling.keys = rightSibling.keys[1:]
@@ -553,7 +561,7 @@ func (t *BPlusTree) rebalanceInternalNode(node *TreeNode) {
 	// 合并节点
 	if pos > 0 {
 		// 与左兄弟合并
-		leftSibling := parent.children[pos-1][0]
+		leftSibling := parent.children[pos-1]
 		parentKey := parent.keys[pos-1]
 
 		leftSibling.keys = append(leftSibling.keys, parentKey)
@@ -561,17 +569,15 @@ func (t *BPlusTree) rebalanceInternalNode(node *TreeNode) {
 		leftSibling.children = append(leftSibling.children, node.children...)
 
 		// 更新子节点的父指针
-		for _, childGroup := range node.children {
-			for _, child := range childGroup {
-				child.parent = leftSibling
-			}
+		for _, child := range node.children {
+			child.parent = leftSibling
 		}
 
 		// 从父节点删除键和子节点
 		t.deleteFromInternalNode(parent, pos-1, node)
 	} else {
 		// 与右兄弟合并
-		rightSibling := parent.children[pos+1][0]
+		rightSibling := parent.children[pos+1]
 		parentKey := parent.keys[pos]
 
 		node.keys = append(node.keys, parentKey)
@@ -579,10 +585,8 @@ func (t *BPlusTree) rebalanceInternalNode(node *TreeNode) {
 		node.children = append(node.children, rightSibling.children...)
 
 		// 更新子节点的父指针
-		for _, childGroup := range rightSibling.children {
-			for _, child := range childGroup {
-				child.parent = node
-			}
+		for _, child := range rightSibling.children {
+			child.parent = node
 		}
 
 		// 从父节点删除键和子节点
@@ -620,10 +624,8 @@ func (n *TreeNode) String(prefix string) string {
 		}
 		result += ")\n"
 
-		for _, childGroup := range n.children {
-			for _, child := range childGroup {
-				result += child.String(prefix + "  ")
-			}
+		for _, child := range n.children {
+			result += child.String(prefix + "  ")
 		}
 	}
 

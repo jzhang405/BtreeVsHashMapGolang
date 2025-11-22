@@ -18,16 +18,16 @@ func defaultHash(data []byte) uint32 {
 
 // HashBucket 哈希桶
 type HashBucket struct {
-	keys    []interface{} // 桶中的键
-	values  []interface{} // 桶中的值
+	keys    []any // 桶中的键
+	values  []any // 桶中的值
 	localDepth int       // 局部深度
 }
 
 // NewHashBucket 创建新的哈希桶
 func NewHashBucket() *HashBucket {
 	return &HashBucket{
-		keys:      make([]interface{}, 0),
-		values:    make([]interface{}, 0),
+		keys:      make([]any, 0),
+		values:    make([]any, 0),
 		localDepth: 0,
 	}
 }
@@ -92,7 +92,7 @@ func NewExtendibleHash(bucketCapacity int, hashFunc HashFunc) *ExtendibleHash {
 }
 
 // getBucketIndex 获取键对应的桶索引
-func (eh *ExtendibleHash) getBucketIndex(key interface{}) (uint32, uint32) {
+func (eh *ExtendibleHash) getBucketIndex(key any) (uint32, uint32) {
 	if key == nil {
 		return 0, 0
 	}
@@ -111,7 +111,7 @@ func (eh *ExtendibleHash) getBucketIndex(key interface{}) (uint32, uint32) {
 }
 
 // Insert 插入键值对
-func (eh *ExtendibleHash) Insert(key interface{}, value interface{}) error {
+func (eh *ExtendibleHash) Insert(key any, value any) error {
 	eh.mu.Lock()
 	defer eh.mu.Unlock()
 
@@ -235,7 +235,7 @@ func (eh *ExtendibleHash) updateDirectoryPointers(index uint32, bucket1, bucket2
 }
 
 // Search 查找值
-func (eh *ExtendibleHash) Search(key interface{}) (interface{}, bool) {
+func (eh *ExtendibleHash) Search(key any) (any, bool) {
 	eh.mu.RLock()
 	defer eh.mu.RUnlock()
 
@@ -257,7 +257,7 @@ func (eh *ExtendibleHash) Search(key interface{}) (interface{}, bool) {
 }
 
 // Delete 删除键值对
-func (eh *ExtendibleHash) Delete(key interface{}) bool {
+func (eh *ExtendibleHash) Delete(key any) bool {
 	eh.mu.Lock()
 	defer eh.mu.Unlock()
 

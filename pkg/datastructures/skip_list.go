@@ -9,14 +9,14 @@ import (
 
 // SkipNode 跳表节点
 type SkipNode struct {
-	key     interface{}    // 键
-	value   interface{}    // 值
+	key     any    // 键
+	value   any    // 值
 	forward []*SkipNode    // 前向指针数组，每一层的下一个节点
 	height  int            // 节点高度（层数）
 }
 
 // NewSkipNode 创建新的跳表节点
-func NewSkipNode(key, value interface{}, height int) *SkipNode {
+func NewSkipNode(key, value any, height int) *SkipNode {
 	return &SkipNode{
 		key:     key,
 		value:   value,
@@ -77,7 +77,7 @@ func (s *SkipList) randomLevel() int {
 }
 
 // Insert 插入键值对
-func (s *SkipList) Insert(key interface{}, value interface{}) error {
+func (s *SkipList) Insert(key any, value any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -127,7 +127,7 @@ func (s *SkipList) Insert(key interface{}, value interface{}) error {
 }
 
 // Search 查找值
-func (s *SkipList) Search(key interface{}) (interface{}, bool) {
+func (s *SkipList) Search(key any) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -156,7 +156,7 @@ func (s *SkipList) Search(key interface{}) (interface{}, bool) {
 }
 
 // Delete 删除键值对
-func (s *SkipList) Delete(key interface{}) bool {
+func (s *SkipList) Delete(key any) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -200,7 +200,7 @@ func (s *SkipList) Delete(key interface{}) bool {
 }
 
 // RangeQuery 范围查询 [start, end)
-func (s *SkipList) RangeQuery(start, end interface{}) ([]KeyValue, error) {
+func (s *SkipList) RangeQuery(start, end any) ([]KeyValue, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
